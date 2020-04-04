@@ -69,6 +69,12 @@ type ElasticsearchSpec struct {
 type TransportConfig struct {
 	// Service defines the template for the associated Kubernetes Service object.
 	Service commonv1.ServiceTemplate `json:"service,omitempty"`
+	// TransportCA is a reference to a kubernetes secret that contains a CA for signing transport certs
+	// The referenced secret should contain the following:
+	//
+	// - `tls.crt`: The certificate authority.
+	// - `tls.key`: The certificate authority key.
+	TransportCA commonv1.SecretRef `json:"transportCA,omitempty"`
 }
 
 // RemoteCluster declares a remote Elasticsearch cluster connection.

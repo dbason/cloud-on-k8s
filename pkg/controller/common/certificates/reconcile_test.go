@@ -70,7 +70,7 @@ func TestReconcileCAAndHTTPCerts(t *testing.T) {
 	// and have the expected labels and content generated
 	checkCertsSecrets := func() {
 		var caCerts corev1.Secret
-		err := c.Get(types.NamespacedName{Namespace: obj.Namespace, Name: CAInternalSecretName(esv1.ESNamer, obj.Name, HTTPCAType)}, &caCerts)
+		err := c.Get(types.NamespacedName{Namespace: obj.Namespace, Name: CAInternalSecretName(esv1.ESNamer, obj.Name, HTTPCAType, "")}, &caCerts)
 		require.NoError(t, err)
 		require.Len(t, caCerts.Data, 2)
 		require.NotEmpty(t, caCerts.Data[CertFileName])
@@ -118,7 +118,7 @@ func TestReconcileCAAndHTTPCerts(t *testing.T) {
 	require.Zero(t, aggregateResult.RequeueAfter)
 	require.Nil(t, httpCerts)
 	removedSecrets := []types.NamespacedName{
-		{Namespace: obj.Namespace, Name: CAInternalSecretName(esv1.ESNamer, obj.Name, HTTPCAType)},
+		{Namespace: obj.Namespace, Name: CAInternalSecretName(esv1.ESNamer, obj.Name, HTTPCAType, "")},
 		{Namespace: obj.Namespace, Name: InternalCertsSecretName(esv1.ESNamer, obj.Name)},
 		{Namespace: obj.Namespace, Name: PublicCertsSecretName(esv1.ESNamer, obj.Name)},
 	}

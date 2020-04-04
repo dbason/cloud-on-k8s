@@ -68,6 +68,7 @@ func (r Reconciler) ReconcileCAAndHTTPCerts(ctx context.Context) (*CertificatesS
 		r.Labels,
 		HTTPCAType,
 		r.CACertRotation,
+		"",
 	)
 	if err != nil {
 		return nil, results.WithError(err)
@@ -110,7 +111,7 @@ func (r *Reconciler) removeCAAndHTTPCertsSecrets() error {
 	}
 	// remove CA secret
 	if err := deleteIfExists(r.K8sClient,
-		types.NamespacedName{Namespace: r.Object.GetNamespace(), Name: CAInternalSecretName(r.Namer, r.Object.GetName(), HTTPCAType)},
+		types.NamespacedName{Namespace: r.Object.GetNamespace(), Name: CAInternalSecretName(r.Namer, r.Object.GetName(), HTTPCAType, "")},
 	); err != nil {
 		return err
 	}

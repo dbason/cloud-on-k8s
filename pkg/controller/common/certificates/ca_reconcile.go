@@ -17,6 +17,7 @@ import (
 	"github.com/elastic/cloud-on-k8s/pkg/controller/common/name"
 	"github.com/elastic/cloud-on-k8s/pkg/controller/common/reconciler"
 	"github.com/elastic/cloud-on-k8s/pkg/utils/k8s"
+	"github.com/pkg/errors"
 )
 
 // CAType is a type of CA
@@ -34,8 +35,12 @@ const (
 )
 
 // CAInternalSecretName returns the name of the internal secret containing the CA certs and keys
-func CAInternalSecretName(namer name.Namer, ownerName string, caType CAType) string {
-	return namer.Suffix(ownerName, string(caType), caInternalSecretSuffix)
+func CAInternalSecretName(namer name.Namer, ownerName string, caType CAType, userDefinedName string) string {
+	if userDefinedName != "" {
+		return userDefinedName
+	} else {
+		return namer.Suffix(ownerName, string(caType), caInternalSecretSuffix)
+	}
 }
 
 // ReconcileCAForOwner ensures that a CA exists for the given owner and CAType, and returns it.
@@ -51,13 +56,14 @@ func ReconcileCAForOwner(
 	labels map[string]string,
 	caType CAType,
 	rotationParams RotationParams,
+	caSecretName string,
 ) (*CA, error) {
 
 	// retrieve current CA secret
 	caInternalSecret := corev1.Secret{}
 	err := cl.Get(types.NamespacedName{
 		Namespace: owner.GetNamespace(),
-		Name:      CAInternalSecretName(namer, owner.GetName(), caType),
+		Name:      CAInternalSecretName(namer, owner.GetName(), caType, caSecretName),
 	}, &caInternalSecret)
 
 	if err != nil && !apierrors.IsNotFound(err) {
@@ -75,8 +81,12 @@ func ReconcileCAForOwner(
 		return renewCA(cl, namer, owner, labels, rotationParams.Validity, caType)
 	}
 
+	// if use provided a CA validate it
+	if caSecretName != "" {
+		return validateUserCA(ca, rotationParams.RotateBefore)
+	}
 	// renew if cannot reuse
-	if !CanReuseCA(ca, rotationParams.RotateBefore) {
+	if !CanReuseCA(ca, rotationParams.RotateBefore, caSecretName) {
 		log.Info("Cannot reuse existing CA, creating a new one", "owner_namespace", owner.GetNamespace(), "owner_name", owner.GetName(), "ca_type", caType)
 		return renewCA(cl, namer, owner, labels, rotationParams.Validity, caType)
 	}
@@ -115,8 +125,8 @@ func renewCA(
 }
 
 // CanReuseCA returns true if the given CA is valid for reuse
-func CanReuseCA(ca *CA, expirationSafetyMargin time.Duration) bool {
-	return PrivateMatchesPublicKey(ca.Cert.PublicKey, *ca.PrivateKey) && CertIsValid(*ca.Cert, expirationSafetyMargin)
+func CanReuseCA(ca *CA, expirationSafetyMargin time.Duration, userDefinedCert string) bool {
+	return (userDefinedCert != "") || (PrivateMatchesPublicKey(ca.Cert.PublicKey, *ca.PrivateKey) && CertIsValid(*ca.Cert, expirationSafetyMargin))
 }
 
 // CertIsValid returns true if the given cert is valid,
@@ -145,7 +155,7 @@ func internalSecretForCA(
 	return corev1.Secret{
 		ObjectMeta: v1.ObjectMeta{
 			Namespace: owner.GetNamespace(),
-			Name:      CAInternalSecretName(namer, owner.GetName(), caType),
+			Name:      CAInternalSecretName(namer, owner.GetName(), caType, ""),
 			Labels:    labels,
 		},
 		Data: map[string][]byte{
@@ -192,4 +202,15 @@ func BuildCAFromSecret(caInternalSecret corev1.Secret) *CA {
 		return nil
 	}
 	return NewCA(privateKey, cert)
+}
+
+// Check if user provided CA is valid and return an error if it's not
+func validateUserCA(ca *CA, expirationSafetyMargin time.Duration) (*CA, error) {
+	if !PrivateMatchesPublicKey(ca.Cert.PublicKey, *ca.PrivateKey) {
+		return nil, errors.New("User CA private and public keys don't match")
+	}
+	if !CertIsValid(*ca.Cert, expirationSafetyMargin) {
+		return nil, errors.New("User CA is about to expire")
+	}
+	return ca, nil
 }

@@ -134,7 +134,7 @@ func Test_canReuseCA(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := CanReuseCA(tt.ca(), DefaultRotateBefore); got != tt.want {
+			if got := CanReuseCA(tt.ca(), DefaultRotateBefore, ""); got != tt.want {
 				t.Errorf("CanReuseCA() = %v, want %v", got, tt.want)
 			}
 		})
@@ -174,7 +174,7 @@ func checkCASecrets(
 	internalCASecret := corev1.Secret{}
 	err := client.Get(types.NamespacedName{
 		Namespace: cluster.Namespace,
-		Name:      CAInternalSecretName(testNamer, cluster.Name, caType),
+		Name:      CAInternalSecretName(testNamer, cluster.Name, caType, ""),
 	}, &internalCASecret)
 	require.NoError(t, err)
 	require.NotEmpty(t, internalCASecret.Data[CertFileName])
@@ -289,6 +289,7 @@ func TestReconcileCAForCluster(t *testing.T) {
 					Validity:     tt.caCertValidity,
 					RotateBefore: DefaultRotateBefore,
 				},
+				"",
 			)
 			require.NoError(t, err)
 			require.NotNil(t, ca)

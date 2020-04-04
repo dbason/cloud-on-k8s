@@ -82,6 +82,7 @@ func Reconcile(
 		certsLabels,
 		certificates.TransportCAType,
 		caRotation,
+		es.Spec.Transport.TransportCA.SecretName,
 	)
 	if err != nil {
 		return nil, results.WithError(err)
